@@ -1,0 +1,62 @@
+# QA Test Framework monorepo
+#
+# This repository tracks all project modules. Keep generated files,
+# local configuration, dependencies, and Unity editor caches out of Git.
+
+# Local build/runtime outputs
+/output/
+node_modules/
+dist/
+build/
+release/
+target/
+coverage/
+logs/
+*.log
+*.tgz
+.env
+.env.local
+.env.*
+!.env.example
+!.env.*.example
+
+# Tool caches and temporary files
+.cache/
+.vite/
+.parcel-cache/
+tmp/
+temp/
+*.tsbuildinfo
+
+# Project-local runtime/config files
+qamcp.config.json
+!qamcp.config.example.json
+registerserver/rustserver/artifacts/
+
+# Unity generated files
+**/[Ll]ibrary/
+**/[Tt]emp/
+**/[Oo]bj/
+**/[Bb]uild/
+**/[Bb]uilds/
+**/[Ll]ogs/
+**/[Uu]ser[Ss]ettings/
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# IDE and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.suo
+*.user
+*.csproj
+*.sln
+*.swp
+*.swo
