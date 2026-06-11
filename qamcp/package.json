@@ -1,0 +1,19 @@
+{
+  "name": "qamcp",
+  "version": "0.1.0",
+  "description": "Rust MCP and CLI tools for the QA Test Framework register server.",
+  "private": true,
+  "scripts": {
+    "start": "cargo run -- mcp",
+    "check": "cargo fmt --check && cargo check",
+    "test": "cargo test",
+    "build:exe": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-release.ps1"
+  },
+  "keywords": [
+    "mcp",
+    "qa",
+    "unity"
+  ],
+  "author": "",
+  "license": "ISC"
+}

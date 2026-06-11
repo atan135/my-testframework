@@ -1,0 +1,93 @@
+[
+  {
+    "stepId": "click_main_activity_button",
+    "methodId": "QaTestFramework.QaTestCommander.ClickMyPanelButton(System.String,System.String,System.Boolean)",
+    "arguments": [
+      "MainUIPanel",
+      "mainui_panel_05/funcs/all_inlet_info/activity_info/left_info/btn_33",
+      true
+    ]
+  },
+  {
+    "stepId": "wait_activity_panel_open",
+    "methodId": "QaTestFramework.Example.QaTestSample.WaitAndReturn(System.Single,System.String)",
+    "arguments": [
+      2,
+      "wait ActivityMainPanel"
+    ]
+  },
+  {
+    "stepId": "check_activity_panel_opened",
+    "methodId": "QaTestFramework.QaTestCommander.IsPanelOpened(System.String,System.Boolean)",
+    "arguments": [
+      "ActivityMainPanel",
+      true
+    ]
+  },
+  {
+    "stepId": "read_new_server_activity_tab",
+    "methodId": "QaTestFramework.QaTestCommander.ReadMyPanelText(System.String,System.String,System.Boolean)",
+    "arguments": [
+      "ActivityMainPanel",
+      "activity_panel/tap_list/content/New Item 1/text",
+      true
+    ]
+  },
+  {
+    "stepId": "click_new_server_activity_tab",
+    "methodId": "QaTestFramework.QaTestCommander.ClickMyPanelButton(System.String,System.String,System.Boolean)",
+    "arguments": [
+      "ActivityMainPanel",
+      "activity_panel/tap_list/content/New Item 1",
+      true
+    ]
+  },
+  {
+    "stepId": "wait_new_server_activity_tab",
+    "methodId": "QaTestFramework.Example.QaTestSample.WaitAndReturn(System.Single,System.String)",
+    "arguments": [
+      1,
+      "wait new server activity tab"
+    ]
+  },
+  {
+    "stepId": "read_fire_sword_blessing_menu",
+    "methodId": "QaTestFramework.QaTestCommander.ReadMyPanelText(System.String,System.String,System.Boolean)",
+    "arguments": [
+      "ActivityMainPanel",
+      "activity_panel/menu_list/content/New Item 0/Text",
+      true
+    ]
+  },
+  {
+    "stepId": "click_fire_sword_blessing_menu",
+    "methodId": "QaTestFramework.QaTestCommander.ClickMyPanelButton(System.String,System.String,System.Boolean)",
+    "arguments": [
+      "ActivityMainPanel",
+      "activity_panel/menu_list/content/New Item 0",
+      true
+    ]
+  },
+  {
+    "stepId": "wait_fire_sword_blessing_page",
+    "methodId": "QaTestFramework.Example.QaTestSample.WaitAndReturn(System.Single,System.String)",
+    "arguments": [
+      1,
+      "wait fire sword blessing page"
+    ]
+  },
+  {
+    "stepId": "assert_floor_15_gift_price_is_200",
+    "methodId": "QaTestFramework.QaTestCommander.AssertPanelFastListDataField(System.String,System.String,System.String,System.String,System.String,System.String,System.Boolean,System.Int32)",
+    "arguments": [
+      "ActivityMainPanel",
+      "activity_panel/viewstack/new_info14/scrollrect/content",
+      "condition_id",
+      "1200002",
+      "game_gold",
+      "200",
+      true,
+      100
+    ]
+  }
+]
