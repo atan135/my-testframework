@@ -77,17 +77,17 @@
           </div>
 
           <el-table :data="selectedClient.methods || []" height="420" empty-text="没有发现 [QaTest] 方法">
-            <el-table-column label="方法名" min-width="220" show-overflow-tooltip>
+            <el-table-column label="方法名" min-width="220">
               <template #default="{ row }">
                 <span class="method-name-text">{{ methodRealName(row) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="显示名" min-width="200" show-overflow-tooltip>
+            <el-table-column label="显示名" min-width="200">
               <template #default="{ row }">
                 <span class="method-display-name-text">{{ methodDisplayName(row) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="描述" min-width="320" show-overflow-tooltip>
+            <el-table-column label="描述" min-width="320">
               <template #default="{ row }">
                 <span class="method-description-text">{{ methodDescription(row) }}</span>
               </template>

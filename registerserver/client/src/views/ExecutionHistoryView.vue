@@ -55,20 +55,18 @@
             <el-tag :type="historyStatusType(row.status)" effect="plain">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="methodName" label="方法" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="methodName" label="方法" min-width="180" />
         <el-table-column label="客户端" min-width="220">
           <template #default="{ row }">
             <div class="history-client-cell">
-              <span class="history-client-name" :title="historyClientTitle(row)">{{ historyClientName(row) }}</span>
-              <el-tooltip content="复制 Client ID" placement="top">
-                <el-button
-                  link
-                  type="primary"
-                  :icon="CopyDocument"
-                  :disabled="!row.clientId"
-                  @click.stop="copyClientId(row)"
-                />
-              </el-tooltip>
+              <span class="history-client-name">{{ historyClientName(row) }}</span>
+              <el-button
+                link
+                type="primary"
+                :icon="CopyDocument"
+                :disabled="!row.clientId"
+                @click.stop="copyClientId(row)"
+              />
             </div>
           </template>
         </el-table-column>
@@ -234,11 +232,6 @@ function openResultDetails(row) {
 function historyClientName(row) {
   const client = findClient(row.clientId);
   return client?.name || row.clientName || row.name || row.clientId || '-';
-}
-
-function historyClientTitle(row) {
-  const name = historyClientName(row);
-  return row.clientId && row.clientId !== name ? `${name} (${row.clientId})` : name;
 }
 
 async function copyClientId(row) {
