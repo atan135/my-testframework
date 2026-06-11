@@ -10,30 +10,47 @@
       </div>
     </header>
 
-    <div class="metric-row">
-      <div class="metric">
-        <span>总记录</span>
-        <strong>{{ history.length }}</strong>
+    <div class="history-toolbar">
+      <div class="history-metrics" aria-label="执行记录统计">
+        <div class="history-metric">
+          <span>总记录</span>
+          <strong>{{ history.length }}</strong>
+        </div>
+        <div class="history-metric">
+          <span>成功</span>
+          <strong>{{ successCount }}</strong>
+        </div>
+        <div class="history-metric">
+          <span>失败</span>
+          <strong>{{ failedCount }}</strong>
+        </div>
       </div>
-      <div class="metric">
-        <span>成功</span>
-        <strong>{{ successCount }}</strong>
-      </div>
-      <div class="metric">
-        <span>失败</span>
-        <strong>{{ failedCount }}</strong>
+      <div class="history-filters">
+        <el-select v-model="statusFilter" class="history-status-filter" placeholder="状态">
+          <el-option label="全部状态" value="all" />
+          <el-option label="成功" value="success" />
+          <el-option label="失败" value="failed" />
+          <el-option label="运行中" value="running" />
+          <el-option label="已取消" value="cancelled" />
+          <el-option label="超时" value="timeout" />
+        </el-select>
+        <el-input
+          v-model="historySearch"
+          class="history-search"
+          clearable
+          placeholder="搜索方法、客户端或输出"
+        />
       </div>
     </div>
 
     <section class="section">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Results</p>
           <h3>最近结果</h3>
         </div>
       </div>
 
-      <el-table :data="history" height="560" empty-text="暂无执行记录">
+      <el-table :data="filteredHistory" height="560" empty-text="暂无执行记录">
         <el-table-column prop="status" label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="historyStatusType(row.status)" effect="plain">{{ row.status }}</el-tag>
@@ -122,10 +139,40 @@ const pendingMethod = ref(null);
 const pendingClientId = ref('');
 const resultDialogVisible = ref(false);
 const selectedResultRecord = ref(null);
+const statusFilter = ref('all');
+const historySearch = ref('');
 const pendingParameters = computed(() => pendingMethod.value?.parameters || []);
 
 const successCount = computed(() => history.value.filter((item) => item.status === 'success').length);
 const failedCount = computed(() => history.value.filter((item) => item.status === 'failed').length);
+const filteredHistory = computed(() => {
+  const query = historySearch.value.trim().toLowerCase();
+  return history.value.filter((item) => {
+    if (statusFilter.value !== 'all' && item.status !== statusFilter.value) {
+      return false;
+    }
+
+    if (!query) {
+      return true;
+    }
+
+    const haystack = [
+      item.status,
+      item.methodName,
+      item.methodDisplayName,
+      item.methodRealName,
+      item.clientId,
+      historyClientName(item),
+      formatOutputPreview(item),
+      item.error,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+
+    return haystack.includes(query);
+  });
+});
 
 function canRerun(row) {
   const client = findClient(row.clientId);
