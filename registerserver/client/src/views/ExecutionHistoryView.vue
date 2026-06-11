@@ -2,7 +2,6 @@
   <div class="page-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">History</p>
         <h2>执行记录</h2>
       </div>
       <div class="topbar-actions">

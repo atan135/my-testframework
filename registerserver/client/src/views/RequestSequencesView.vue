@@ -2,7 +2,6 @@
   <div class="page-view">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Sequence</p>
         <h2>请求序列</h2>
       </div>
       <div class="topbar-actions">
@@ -15,7 +14,6 @@
       <section class="section method-catalog">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Target</p>
             <h3>请求来源</h3>
           </div>
         </div>
@@ -47,7 +45,6 @@
       <section class="section sequence-builder">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Builder</p>
             <h3>执行步骤</h3>
           </div>
           <div class="sequence-options">
@@ -104,7 +101,6 @@
     <section class="section">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">Server Responses</p>
           <h3>服务端返回结果</h3>
         </div>
       </div>

@@ -14,7 +14,6 @@
       <section class="section client-picker">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Clients</p>
             <h3>Unity 实例</h3>
           </div>
           <el-tag effect="plain">{{ clients.length }}</el-tag>
@@ -38,7 +37,6 @@
         <section class="section selected-client-panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Selected</p>
               <h3>选中实例信息</h3>
             </div>
             <el-tag :type="selectedClient.available === false ? 'danger' : 'success'" effect="plain">{{ clientStatusText }}</el-tag>
@@ -74,7 +72,6 @@
         <section class="section methods-panel">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">QaTest</p>
               <h3>可执行方法</h3>
             </div>
           </div>
