@@ -507,7 +507,7 @@ h3 {
 
 .history-client-name {
   min-width: 0;
-  flex: 1;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -587,6 +587,33 @@ h3 {
 .client-list {
   flex: 1;
   min-height: 0;
+}
+
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.metric {
+  min-width: 0;
+  border: 1px solid #d9e1ea;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.metric span {
+  color: #607086;
+  font-size: 13px;
+}
+
+.metric strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .history-toolbar {
@@ -728,6 +755,10 @@ h3 {
 
   .history-search {
     width: 100%;
+  }
+
+  .metric-row {
+    grid-template-columns: 1fr;
   }
 
   .result-detail-meta {

@@ -56,7 +56,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="methodName" label="方法" min-width="180" />
-        <el-table-column label="客户端" min-width="220">
+        <el-table-column label="客户端" width="170">
           <template #default="{ row }">
             <div class="history-client-cell">
               <span class="history-client-name">{{ historyClientName(row) }}</span>
@@ -120,7 +120,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watchEffect } from 'vue';
 import { ElMessage } from 'element-plus/es/components/message/index.mjs';
 import { CopyDocument, Refresh, RefreshRight, View } from '@element-plus/icons-vue';
 
@@ -138,10 +138,28 @@ const resultDialogVisible = ref(false);
 const selectedResultRecord = ref(null);
 const statusFilter = ref('all');
 const historySearch = ref('');
+const clientNameById = ref({});
 const pendingParameters = computed(() => pendingMethod.value?.parameters || []);
 
 const successCount = computed(() => history.value.filter((item) => item.status === 'success').length);
 const failedCount = computed(() => history.value.filter((item) => item.status === 'failed').length);
+
+watchEffect(() => {
+  const next = { ...clientNameById.value };
+  for (const client of clients.value) {
+    if (client.clientId && client.name) {
+      next[client.clientId] = client.name;
+    }
+  }
+  for (const item of history.value) {
+    const name = historyClientNameFromRecord(item);
+    if (item.clientId && name && name !== item.clientId) {
+      next[item.clientId] = name;
+    }
+  }
+  clientNameById.value = next;
+});
+
 const filteredHistory = computed(() => {
   const query = historySearch.value.trim().toLowerCase();
   return history.value.filter((item) => {
@@ -231,7 +249,21 @@ function openResultDetails(row) {
 
 function historyClientName(row) {
   const client = findClient(row.clientId);
-  return client?.name || row.clientName || row.name || row.clientId || '-';
+  return client?.name || clientNameById.value[row.clientId] || historyClientNameFromRecord(row) || row.clientId || '-';
+}
+
+function historyClientNameFromRecord(row) {
+  return (
+    row.clientName ||
+    row.name ||
+    row.client?.name ||
+    row.client?.clientName ||
+    row.clientSnapshot?.name ||
+    row.clientSnapshot?.clientName ||
+    row.client_snapshot?.name ||
+    row.client_snapshot?.clientName ||
+    ''
+  );
 }
 
 async function copyClientId(row) {
