@@ -29,6 +29,7 @@ temp/
 *.tsbuildinfo
 
 # Project-local runtime/config files
+local_help.txt
 qamcp.config.json
 !qamcp.config.example.json
 registerserver/rustserver/artifacts/
