@@ -40,7 +40,22 @@
           </template>
         </el-table-column>
         <el-table-column prop="methodName" label="方法" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="clientId" label="客户端" min-width="180" show-overflow-tooltip />
+        <el-table-column label="客户端" min-width="220">
+          <template #default="{ row }">
+            <div class="history-client-cell">
+              <span class="history-client-name" :title="historyClientTitle(row)">{{ historyClientName(row) }}</span>
+              <el-tooltip content="复制 Client ID" placement="top">
+                <el-button
+                  link
+                  type="primary"
+                  :icon="CopyDocument"
+                  :disabled="!row.clientId"
+                  @click.stop="copyClientId(row)"
+                />
+              </el-tooltip>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="输出" min-width="360">
           <template #default="{ row }">
             <div class="result-cell">
@@ -93,7 +108,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { ElMessage } from 'element-plus/es/components/message/index.mjs';
-import { Refresh, RefreshRight, View } from '@element-plus/icons-vue';
+import { CopyDocument, Refresh, RefreshRight, View } from '@element-plus/icons-vue';
 
 import ResultDetailsDialog from '../components/ResultDetailsDialog.vue';
 import { useQaStore } from '../composables/useQaStore';
@@ -168,6 +183,49 @@ async function executeRerun(clientId, method, args) {
 function openResultDetails(row) {
   selectedResultRecord.value = row;
   resultDialogVisible.value = true;
+}
+
+function historyClientName(row) {
+  const client = findClient(row.clientId);
+  return client?.name || row.clientName || row.name || row.clientId || '-';
+}
+
+function historyClientTitle(row) {
+  const name = historyClientName(row);
+  return row.clientId && row.clientId !== name ? `${name} (${row.clientId})` : name;
+}
+
+async function copyClientId(row) {
+  if (!row.clientId) {
+    return;
+  }
+
+  try {
+    await copyText(row.clientId);
+    ElMessage.success('已复制 Client ID');
+  } catch (error) {
+    ElMessage.error(error.message || '复制失败');
+  }
+}
+
+async function copyText(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = value;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const copied = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (!copied) {
+    throw new Error('浏览器拒绝复制');
+  }
 }
 
 function findClient(clientId) {
