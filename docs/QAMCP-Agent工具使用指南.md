@@ -93,6 +93,8 @@ cd qamcp/dist
 - `qa_poll_event_session`: 轮询事件会话，读取新事件和 `nextCursor`
 - `qa_close_event_session`: 关闭事件会话并释放 WebSocket 连接
 
+`qa_find_methods` 和 `qa_get_method` 会返回方法元数据 `allowParallelExecution`。该值为 `true` 时，Agent 直接调用 `qa_execute_method` 即可，register server 会根据 Unity 注册元数据自动允许同一 Unity 客户端并行下发这类只读查询请求；qamcp 不需要也不提供额外的强制并行参数。
+
 ## 长连接事件用法
 
 如果只想临时观察一小段时间，可以让 AI 调用 `qa_watch_events`：

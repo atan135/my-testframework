@@ -401,7 +401,7 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "qa_find_methods",
             "搜索 QaTest 方法",
-            "按客户端、方法名、方法 ID、声明类型或描述搜索已注册的 QaTest 方法。",
+            "按客户端、方法名、方法 ID、声明类型或描述搜索已注册的 QaTest 方法；返回的 allowParallelExecution 表示该方法注册为可并行执行。",
             object_schema(
                 vec![
                     ("clientId", string_schema("限定搜索某个 Unity 客户端。")),
@@ -417,7 +417,7 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "qa_get_method",
             "获取 QaTest 方法详情",
-            "按精确 methodId、短 methodId 或方法名获取已注册 QaTest 方法详情；query 用 | 分隔时可一次查询多个。",
+            "按精确 methodId、短 methodId 或方法名获取已注册 QaTest 方法详情；query 用 | 分隔时可一次查询多个；返回的 allowParallelExecution 表示该方法注册为可并行执行。",
             object_schema(
                 vec![
                     ("clientId", string_schema("限定搜索某个 Unity 客户端。")),
@@ -455,7 +455,7 @@ fn tool_definitions() -> Vec<Value> {
         tool(
             "qa_execute_method",
             "执行单个 QaTest 方法",
-            "通过 QA 服务 WebSocket 执行一个已注册的 QaTest 方法，并等待执行结果。",
+            "通过 QA 服务 WebSocket 执行一个已注册的 QaTest 方法，并等待执行结果；如果方法注册元数据 allowParallelExecution=true，server 会自动允许同一 Unity 客户端并行下发该只读查询类请求。",
             object_schema(
                 vec![
                     ("clientId", string_schema("Unity 客户端 ID。")),

@@ -79,6 +79,8 @@ qamcp clients --text
 
 `run` 方法参数优先使用重复 `-a` / `--arg` 按顺序传入，例如 `-a val1 -a val2`。大文本参数可使用 `--arg-file <path>`，qamcp 会在本机读取文件内容，并把内容作为该位置的一个字符串参数发送给 Unity 客户端；`-a` 和 `--arg-file` 可以按出现顺序混用。旧的 `--args <json-array>` 仍兼容已有脚本，但在 PowerShell 和 cmd 中容易被引号/转义规则改写，不再作为推荐用法。
 
+`search` 和 `describe` 返回的 `allowParallelExecution` 来自 Unity 注册的方法元数据。该值为 `true` 时，`run`/`qa_execute_method` 不需要额外参数，register server 会自动允许同一 Unity 客户端并行下发这类只读查询请求。
+
 可用子命令：`health`、`clients`、`config`、`search`、`describe`、`results`、`run`、`sequence`、`stop`、`wait`、`watch`、`mcp`。
 
 方法发现相关命令只保留 `search` 和 `describe`；旧的 `tools`、`tool`、`methods`、`find`、`method` 不再作为 CLI command 使用。
@@ -132,10 +134,10 @@ dist/qamcp.exe
 
 - `qa_health`: 检查 QA register server 健康状态。
 - `qa_list_unity_clients`: 列出当前在线 Unity 客户端，可选择是否返回完整方法列表。
-- `qa_find_methods`: 按客户端、方法名、方法 ID、声明类型、描述或返回类型搜索 `[QaTest]` 方法。
-- `qa_get_method`: 按精确 methodId、短 methodId 或方法名获取一个或多个 `[QaTest]` 方法详情，多个查询用 `|` 分隔。
+- `qa_find_methods`: 按客户端、方法名、方法 ID、声明类型、描述或返回类型搜索 `[QaTest]` 方法，返回 `allowParallelExecution`。
+- `qa_get_method`: 按精确 methodId、短 methodId 或方法名获取一个或多个 `[QaTest]` 方法详情，多个查询用 `|` 分隔，返回 `allowParallelExecution`。
 - `qa_get_results`: 查询最近执行记录，支持按 `clientId`、`status`、`sequenceId` 过滤。
-- `qa_execute_method`: 通过 WebSocket 执行单个 `[QaTest]` 方法并等待 `qa_result`。
+- `qa_execute_method`: 通过 WebSocket 执行单个 `[QaTest]` 方法并等待 `qa_result`；方法元数据 `allowParallelExecution=true` 时由 server 自动并行放行。
 - `qa_execute_sequence`: 顺序执行多个 `[QaTest]` 方法并等待 `sequence_finished`，可用 `stepDelayMs` 设置相邻步骤间隔。
 - `qa_stop_execution`: 停止正在运行的单次执行。
 - `qa_stop_sequence`: 停止正在运行的请求序列。

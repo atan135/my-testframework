@@ -127,6 +127,7 @@ pub fn print_help(command: Option<&str>) {
             "  QaTest 方法由当前 Unity 项目动态注册；help 不固定展示具体 methodId。",
             "  run 参数优先使用重复 -a/--arg，避免 PowerShell/cmd 对 JSON 引号和转义符的改写。",
             "  --arg-file 由 qamcp 所在机器读取文件，Unity 客户端只接收文件内容字符串。",
+            "  方法注册元数据 allowParallelExecution=true 时，server 会自动允许只读查询类方法并行执行；qamcp run 不需要额外并行参数。",
         ],
         Some("capture-screenshot") => vec![
             "capture-screenshot 用法:",
@@ -198,6 +199,7 @@ pub fn print_help(command: Option<&str>) {
             "",
             "AI 调用提示:",
             "  默认输出 JSON；QaTest 方法由当前 Unity 项目动态注册，先用 search/describe 获取实际 methodId。",
+            "  search/describe 会返回 allowParallelExecution；值为 true 的只读查询类方法可由 server 自动并行下发。",
             "",
             "常用示例:",
             "  qamcp --help",
@@ -381,6 +383,7 @@ fn print_tools(data: &Value, options: &CliOptions) {
             "clientId",
             "methodName",
             "methodId",
+            "parallel",
             "params",
             "returnType",
             "description",
@@ -392,6 +395,12 @@ fn print_tools(data: &Value, options: &CliOptions) {
                     text(method, "clientId").unwrap_or_default(),
                     text(method, "methodName").unwrap_or_default(),
                     text(method, "methodId").unwrap_or_default(),
+                    format_bool(
+                        method
+                            .get("allowParallelExecution")
+                            .and_then(Value::as_bool),
+                    )
+                    .unwrap_or_default(),
                     format_parameters(method.get("parameters")),
                     text(method, "returnType").unwrap_or_default(),
                     text(method, "description").unwrap_or_default(),
@@ -435,6 +444,14 @@ fn print_tool_detail(method: &Value, match_data: &Value) {
         (
             "Static",
             format_bool(method.get("isStatic").and_then(Value::as_bool)),
+        ),
+        (
+            "Parallel",
+            format_bool(
+                method
+                    .get("allowParallelExecution")
+                    .and_then(Value::as_bool),
+            ),
         ),
         (
             "Parameters",
@@ -758,7 +775,11 @@ fn format_seconds(value: Option<&Value>) -> Option<String> {
 }
 
 fn format_bool(value: Option<bool>) -> Option<String> {
-    value.map(|value| if value { "yes" } else { "no" }.to_string())
+    value.map(format_bool_text)
+}
+
+fn format_bool_text(value: bool) -> String {
+    if value { "yes" } else { "no" }.to_string()
 }
 
 fn value_to_string(value: Option<&Value>) -> Option<String> {
