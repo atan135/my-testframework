@@ -28,11 +28,13 @@ namespace QaTestFramework
         public const string ClientIdPlayerPrefsKey = "QaTest.ClientId";
         public const string ClientNamePlayerPrefsKey = "QaTest.ClientName";
         public const string AutoConnectOnStartupPlayerPrefsKey = "QaTest.AutoConnectOnStartup";
+        public const string RegistryScanAssembliesPlayerPrefsKey = "QaTest.RegistryScanAssemblies";
         private const string ServerIPKey = ServerIPPlayerPrefsKey;
         private const string ServerPortKey = ServerPortPlayerPrefsKey;
         private const string ClientIdKey = ClientIdPlayerPrefsKey;
         private const string ClientNameKey = ClientNamePlayerPrefsKey;
         private const string AutoConnectOnStartupKey = AutoConnectOnStartupPlayerPrefsKey;
+        private const string RegistryScanAssembliesKey = RegistryScanAssembliesPlayerPrefsKey;
         private const string DefaultServerIP = "localhost";
         private const int DefaultServerPort = 3000;
         private const string ServerScheme = "ws";
@@ -42,6 +44,7 @@ namespace QaTestFramework
         private const string PackageName = "com.qatestframework.unityclient";
         private const string PackageJsonFileName = "package.json";
         private const string PackageVersionFallback = "0.1.9";
+        private const string RuntimeAssemblyName = "QaTestFramework.UnityClient";
         private const string RegistryLogPrefix = "[QaTest][Registry] ";
         public const string EnabledPlayerPrefsKey = "QaTest.Enabled";
         public const string EnabledEnvironmentVariable = "QA_TEST_ENABLED";
@@ -617,6 +620,7 @@ namespace QaTestFramework
         public static void SetRegistryScanAssemblyNames(string assemblyNames)
         {
             registryScanAssemblyNames = ParseRegistryScanAssemblyNames(assemblyNames);
+            SaveRegistryScanAssemblyNamesToPlayerPrefs(registryScanAssemblyNames);
             Debug.Log(
                 RegistryLogPrefix +
                 "SetRegistryScanAssemblyNames raw='" + (assemblyNames ?? "<null>") +
@@ -770,19 +774,24 @@ namespace QaTestFramework
                 (registryScanAssemblyNames != null ? registryScanAssemblyNames.Length : 0) +
                 " configured=[" + FormatRegistryScanAssemblyNames() + "]");
 
-            Assembly[] scanAssemblies = ResolveRegistryScanAssemblies();
-            if (registryScanAssemblyNames != null && registryScanAssemblyNames.Length > 0)
+            string[] effectiveAssemblyNames = ResolveEffectiveRegistryScanAssemblyNames();
+            Assembly[] scanAssemblies = ResolveRegistryScanAssemblies(effectiveAssemblyNames);
+            if (scanAssemblies.Length > 0)
             {
                 Debug.Log(
                     RegistryLogPrefix +
-                    "RefreshRegistry using configured assemblies resolvedCount=" + scanAssemblies.Length +
+                    "RefreshRegistry using resolved assemblies requested=[" + FormatRegistryScanAssemblyNames(effectiveAssemblyNames) +
+                    "] resolvedCount=" + scanAssemblies.Length +
                     " resolved=[" + FormatAssemblyNames(scanAssemblies) + "]");
                 registry.Refresh(scanAssemblies);
             }
             else
             {
-                Debug.Log(RegistryLogPrefix + "RefreshRegistry using all loaded assemblies.");
-                registry.Refresh();
+                Debug.LogWarning(
+                    RegistryLogPrefix +
+                    "RefreshRegistry skipped: no registry scan assemblies resolved. " +
+                    "Full AppDomain scan is disabled to avoid IL2CPP/HybridCLR reflection crash.");
+                registry.Refresh(new Assembly[0]);
             }
 
             registeredMethodCount = registry.Methods.Count;
@@ -1680,28 +1689,57 @@ namespace QaTestFramework
             return names.ToArray();
         }
 
-        private static Assembly[] ResolveRegistryScanAssemblies()
+        private static string[] ResolveEffectiveRegistryScanAssemblyNames()
         {
-            if (registryScanAssemblyNames == null || registryScanAssemblyNames.Length == 0)
+            if (registryScanAssemblyNames != null && registryScanAssemblyNames.Length > 0)
             {
-                Debug.Log(RegistryLogPrefix + "ResolveRegistryScanAssemblies skipped: no configured assembly names.");
+                Debug.Log(RegistryLogPrefix + "ResolveEffectiveRegistryScanAssemblyNames using runtime configured=[" + FormatRegistryScanAssemblyNames() + "]");
+                return registryScanAssemblyNames;
+            }
+
+            string[] persistedAssemblyNames = LoadRegistryScanAssemblyNamesFromPlayerPrefs();
+            if (persistedAssemblyNames.Length > 0)
+            {
+                registryScanAssemblyNames = persistedAssemblyNames;
+                Debug.Log(RegistryLogPrefix + "ResolveEffectiveRegistryScanAssemblyNames using PlayerPrefs configured=[" + FormatRegistryScanAssemblyNames(persistedAssemblyNames) + "]");
+                return persistedAssemblyNames;
+            }
+
+            string[] autoDetectedAssemblyNames = AutoDetectRegistryScanAssemblyNames();
+            Debug.Log(RegistryLogPrefix + "ResolveEffectiveRegistryScanAssemblyNames autoDetected=[" + FormatRegistryScanAssemblyNames(autoDetectedAssemblyNames) + "]");
+            return autoDetectedAssemblyNames;
+        }
+
+        private static Assembly[] ResolveRegistryScanAssemblies(string[] requestedAssemblyNames)
+        {
+            if (requestedAssemblyNames == null || requestedAssemblyNames.Length == 0)
+            {
+                Debug.Log(RegistryLogPrefix + "ResolveRegistryScanAssemblies skipped: no effective assembly names.");
                 return new Assembly[0];
             }
 
             Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
             Debug.Log(
                 RegistryLogPrefix +
-                "ResolveRegistryScanAssemblies begin requested=[" + FormatRegistryScanAssemblyNames() +
+                "ResolveRegistryScanAssemblies begin requested=[" + FormatRegistryScanAssemblyNames(requestedAssemblyNames) +
                 "] loadedAssemblyCount=" + (loadedAssemblies != null ? loadedAssemblies.Length : 0));
 
             List<Assembly> assemblies = new List<Assembly>();
-            for (int i = 0; i < registryScanAssemblyNames.Length; i++)
+            HashSet<string> resolvedAssemblyNames = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < requestedAssemblyNames.Length; i++)
             {
-                string assemblyName = registryScanAssemblyNames[i];
+                string assemblyName = requestedAssemblyNames[i];
                 Assembly assembly = FindLoadedAssembly(loadedAssemblies, assemblyName);
                 if (assembly == null)
                 {
                     Debug.LogWarning(RegistryLogPrefix + "Registry scan assembly not found: " + assemblyName);
+                    continue;
+                }
+
+                string resolvedAssemblyName = FormatAssemblyName(assembly);
+                if (!resolvedAssemblyNames.Add(resolvedAssemblyName))
+                {
+                    Debug.Log(RegistryLogPrefix + "Resolved registry scan assembly skipped duplicate: " + assemblyName + " -> " + resolvedAssemblyName);
                     continue;
                 }
 
@@ -1713,14 +1751,117 @@ namespace QaTestFramework
             return assemblies.ToArray();
         }
 
+        private static string[] LoadRegistryScanAssemblyNamesFromPlayerPrefs()
+        {
+            string persistedValue = PlayerPrefs.GetString(RegistryScanAssembliesKey, string.Empty);
+            string[] names = ParseRegistryScanAssemblyNames(persistedValue);
+            Debug.Log(
+                RegistryLogPrefix +
+                "LoadRegistryScanAssemblyNamesFromPlayerPrefs raw='" + persistedValue +
+                "' parsedCount=" + names.Length +
+                " parsed=[" + FormatRegistryScanAssemblyNames(names) + "]");
+            return names;
+        }
+
+        private static void SaveRegistryScanAssemblyNamesToPlayerPrefs(string[] assemblyNames)
+        {
+            string value = FormatRegistryScanAssemblyNames(assemblyNames);
+            if (assemblyNames == null || assemblyNames.Length == 0)
+            {
+                PlayerPrefs.DeleteKey(RegistryScanAssembliesKey);
+            }
+            else
+            {
+                PlayerPrefs.SetString(RegistryScanAssembliesKey, value);
+            }
+
+            PlayerPrefs.Save();
+            Debug.Log(RegistryLogPrefix + "SaveRegistryScanAssemblyNamesToPlayerPrefs value=[" + value + "]");
+        }
+
+        private static string[] AutoDetectRegistryScanAssemblyNames()
+        {
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            List<string> names = new List<string>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+
+            if (loadedAssemblies == null)
+            {
+                return names.ToArray();
+            }
+
+            for (int i = 0; i < loadedAssemblies.Length; i++)
+            {
+                Assembly assembly = loadedAssemblies[i];
+                if (assembly == null)
+                {
+                    continue;
+                }
+
+                string assemblyName = FormatAssemblyName(assembly);
+                if (string.Equals(assemblyName, RuntimeAssemblyName, StringComparison.Ordinal) ||
+                    ReferencesAssembly(assembly, RuntimeAssemblyName))
+                {
+                    if (seen.Add(assemblyName))
+                    {
+                        names.Add(assemblyName);
+                        Debug.Log(RegistryLogPrefix + "AutoDetectRegistryScanAssemblyNames include: " + assemblyName);
+                    }
+                }
+            }
+
+            return names.ToArray();
+        }
+
+        private static bool ReferencesAssembly(Assembly assembly, string referencedAssemblyName)
+        {
+            if (assembly == null || string.IsNullOrEmpty(referencedAssemblyName))
+            {
+                return false;
+            }
+
+            try
+            {
+                AssemblyName[] referencedAssemblies = assembly.GetReferencedAssemblies();
+                if (referencedAssemblies == null)
+                {
+                    return false;
+                }
+
+                for (int i = 0; i < referencedAssemblies.Length; i++)
+                {
+                    AssemblyName referencedAssembly = referencedAssemblies[i];
+                    if (referencedAssembly != null &&
+                        string.Equals(referencedAssembly.Name, referencedAssemblyName, StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    RegistryLogPrefix +
+                    "ReferencesAssembly failed: " + FormatAssemblyName(assembly) +
+                    " " + exception.GetType().Name + ": " + exception.Message);
+            }
+
+            return false;
+        }
+
         private static string FormatRegistryScanAssemblyNames()
         {
-            if (registryScanAssemblyNames == null)
+            return FormatRegistryScanAssemblyNames(registryScanAssemblyNames);
+        }
+
+        private static string FormatRegistryScanAssemblyNames(string[] assemblyNames)
+        {
+            if (assemblyNames == null)
             {
                 return "<null>";
             }
 
-            return string.Join(",", registryScanAssemblyNames);
+            return string.Join(",", assemblyNames);
         }
 
         private static string FormatAssemblyNames(IEnumerable<Assembly> assemblies)
