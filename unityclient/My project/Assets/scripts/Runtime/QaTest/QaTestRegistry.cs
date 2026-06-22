@@ -8,6 +8,7 @@ namespace QaTestFramework
 {
     internal sealed class QaTestRegistry
     {
+        private const string RegistryLogPrefix = "[QaTest][Registry] ";
         private readonly Dictionary<string, QaTestMethodEntry> methods = new Dictionary<string, QaTestMethodEntry>();
         private readonly Dictionary<string, QaTestMethodEntry> methodsByFullId = new Dictionary<string, QaTestMethodEntry>();
 
@@ -18,35 +19,59 @@ namespace QaTestFramework
 
         public void Refresh()
         {
-            Refresh(AppDomain.CurrentDomain.GetAssemblies());
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            Debug.Log(RegistryLogPrefix + "QaTestRegistry.Refresh all assemblies count=" + (loadedAssemblies != null ? loadedAssemblies.Length : 0));
+            Refresh(loadedAssemblies);
         }
 
         public void Refresh(IEnumerable<Assembly> assemblies)
         {
+            Debug.Log(RegistryLogPrefix + "QaTestRegistry.Refresh begin.");
             methods.Clear();
             methodsByFullId.Clear();
             List<QaTestMethodCandidate> candidates = new List<QaTestMethodCandidate>();
 
             IEnumerable<Assembly> scanAssemblies = assemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+            int assemblyIndex = 0;
             foreach (Assembly assembly in scanAssemblies)
             {
                 if (assembly == null)
                 {
+                    Debug.Log(RegistryLogPrefix + "Scan assembly[" + assemblyIndex + "] skipped: null.");
+                    assemblyIndex++;
                     continue;
                 }
 
-                foreach (Type type in SafeGetTypes(assembly))
+                string assemblyName = FormatAssemblyName(assembly);
+                Debug.Log(RegistryLogPrefix + "Scan assembly[" + assemblyIndex + "] begin: " + assemblyName);
+                Type[] types = SafeGetTypes(assembly);
+                Debug.Log(RegistryLogPrefix + "Scan assembly[" + assemblyIndex + "] typesCount=" + (types != null ? types.Length : 0) + ": " + assemblyName);
+
+                int typeIndex = 0;
+                foreach (Type type in types)
                 {
-                    CollectType(type, candidates);
+                    CollectType(type, assemblyName, typeIndex, candidates);
+                    typeIndex++;
                 }
+
+                Debug.Log(RegistryLogPrefix + "Scan assembly[" + assemblyIndex + "] end: " + assemblyName + " candidates=" + candidates.Count);
+                assemblyIndex++;
             }
 
+            Debug.Log(RegistryLogPrefix + "ValidateUniqueMethodNames begin candidateCount=" + candidates.Count);
             ValidateUniqueMethodNames(candidates);
+            Debug.Log(RegistryLogPrefix + "ValidateUniqueMethodNames end.");
 
+            int candidateIndex = 0;
             foreach (QaTestMethodCandidate candidate in candidates)
             {
+                Debug.Log(RegistryLogPrefix + "Register candidate[" + candidateIndex + "] begin: " + BuildDefinitionMethodId(candidate.Method));
                 RegisterMethod(candidate.Method, candidate.Attribute);
+                Debug.Log(RegistryLogPrefix + "Register candidate[" + candidateIndex + "] end: " + BuildDefinitionMethodId(candidate.Method));
+                candidateIndex++;
             }
+
+            Debug.Log(RegistryLogPrefix + "QaTestRegistry.Refresh end methods=" + methods.Count + " fullMethods=" + methodsByFullId.Count);
         }
 
         public bool TryGet(string methodId, out QaTestMethodEntry entry)
@@ -78,24 +103,43 @@ namespace QaTestFramework
                 .ToArray();
         }
 
-        private void CollectType(Type type, List<QaTestMethodCandidate> candidates)
+        private void CollectType(Type type, string assemblyName, int typeIndex, List<QaTestMethodCandidate> candidates)
         {
             if (type == null)
             {
+                Debug.Log(RegistryLogPrefix + "Collect type[" + typeIndex + "] skipped: null in " + assemblyName);
                 return;
             }
 
+            string typeName = FormatTypeName(type);
+            Debug.Log(RegistryLogPrefix + "Collect type[" + typeIndex + "] begin: " + typeName + " in " + assemblyName);
             BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly;
-            foreach (MethodInfo method in type.GetMethods(flags))
+            MethodInfo[] methodsOnType = type.GetMethods(flags);
+            Debug.Log(RegistryLogPrefix + "Collect type[" + typeIndex + "] methodCount=" + (methodsOnType != null ? methodsOnType.Length : 0) + ": " + typeName);
+
+            int methodIndex = 0;
+            foreach (MethodInfo method in methodsOnType)
             {
+                string methodId = BuildDefinitionMethodId(method);
+                Debug.Log(RegistryLogPrefix + "Inspect method[" + methodIndex + "] begin: " + methodId);
                 QaTestAttribute attribute = method.GetCustomAttribute<QaTestAttribute>(true);
                 if (attribute == null || method.ContainsGenericParameters)
                 {
+                    Debug.Log(
+                        RegistryLogPrefix +
+                        "Inspect method[" + methodIndex + "] skip: " + methodId +
+                        " attribute=" + (attribute != null) +
+                        " containsGenericParameters=" + method.ContainsGenericParameters);
+                    methodIndex++;
                     continue;
                 }
 
+                Debug.Log(RegistryLogPrefix + "Inspect method[" + methodIndex + "] candidate: " + methodId);
                 candidates.Add(new QaTestMethodCandidate(method, attribute));
+                methodIndex++;
             }
+
+            Debug.Log(RegistryLogPrefix + "Collect type[" + typeIndex + "] end: " + typeName + " candidates=" + candidates.Count);
         }
 
         private static void ValidateUniqueMethodNames(IEnumerable<QaTestMethodCandidate> candidates)
@@ -127,10 +171,13 @@ namespace QaTestFramework
             Type declaringType = method.DeclaringType;
             if (declaringType == null || !typeof(MonoBehaviour).IsAssignableFrom(declaringType))
             {
+                Debug.Log(RegistryLogPrefix + "Register non-static skipped because declaring type is not MonoBehaviour: " + BuildDefinitionMethodId(method));
                 return;
             }
 
+            Debug.Log(RegistryLogPrefix + "FindObjectsOfType begin: " + declaringType.FullName);
             UnityEngine.Object[] targets = UnityEngine.Object.FindObjectsOfType(declaringType, true);
+            Debug.Log(RegistryLogPrefix + "FindObjectsOfType end: " + declaringType.FullName + " count=" + (targets != null ? targets.Length : 0));
             if (targets.Length > 1)
             {
                 throw new InvalidOperationException(
@@ -169,6 +216,7 @@ namespace QaTestFramework
             QaTestMethodEntry entry = new QaTestMethodEntry(id, fullId, method, target, attribute);
             methods[id] = entry;
             methodsByFullId[fullId] = entry;
+            Debug.Log(RegistryLogPrefix + "AddMethod success id=" + id + " fullId=" + fullId);
         }
 
         private static string BuildShortMethodId(MethodInfo method)
@@ -197,20 +245,59 @@ namespace QaTestFramework
             return id;
         }
 
-        private static IEnumerable<Type> SafeGetTypes(Assembly assembly)
+        private static Type[] SafeGetTypes(Assembly assembly)
         {
+            string assemblyName = FormatAssemblyName(assembly);
+            Debug.Log(RegistryLogPrefix + "SafeGetTypes begin: " + assemblyName);
             try
             {
-                return assembly.GetTypes();
+                Type[] types = assembly.GetTypes();
+                Debug.Log(RegistryLogPrefix + "SafeGetTypes end: " + assemblyName + " count=" + (types != null ? types.Length : 0));
+                return types ?? Array.Empty<Type>();
             }
             catch (ReflectionTypeLoadException exception)
             {
-                return exception.Types.Where(type => type != null);
+                Type[] types = exception.Types.Where(type => type != null).ToArray();
+                Debug.LogWarning(
+                    RegistryLogPrefix +
+                    "SafeGetTypes ReflectionTypeLoadException: " + assemblyName +
+                    " loadedCount=" + types.Length +
+                    " loaderExceptionCount=" + (exception.LoaderExceptions != null ? exception.LoaderExceptions.Length : 0));
+                return types;
             }
-            catch
+            catch (Exception exception)
             {
+                Debug.LogWarning(RegistryLogPrefix + "SafeGetTypes failed: " + assemblyName + " " + exception.GetType().Name + ": " + exception.Message);
                 return Array.Empty<Type>();
             }
+        }
+
+        private static string FormatAssemblyName(Assembly assembly)
+        {
+            if (assembly == null)
+            {
+                return "<null>";
+            }
+
+            try
+            {
+                AssemblyName name = assembly.GetName();
+                return name != null ? name.Name : "<unknown>";
+            }
+            catch (Exception exception)
+            {
+                return "<assembly-name-error:" + exception.GetType().Name + ">";
+            }
+        }
+
+        private static string FormatTypeName(Type type)
+        {
+            if (type == null)
+            {
+                return "<null>";
+            }
+
+            return string.IsNullOrEmpty(type.FullName) ? type.Name : type.FullName;
         }
 
         private sealed class QaTestMethodCandidate

@@ -42,6 +42,7 @@ namespace QaTestFramework
         private const string PackageName = "com.qatestframework.unityclient";
         private const string PackageJsonFileName = "package.json";
         private const string PackageVersionFallback = "0.1.9";
+        private const string RegistryLogPrefix = "[QaTest][Registry] ";
         public const string EnabledPlayerPrefsKey = "QaTest.Enabled";
         public const string EnabledEnvironmentVariable = "QA_TEST_ENABLED";
         private const string EnabledKey = EnabledPlayerPrefsKey;
@@ -616,11 +617,21 @@ namespace QaTestFramework
         public static void SetRegistryScanAssemblyNames(string assemblyNames)
         {
             registryScanAssemblyNames = ParseRegistryScanAssemblyNames(assemblyNames);
+            Debug.Log(
+                RegistryLogPrefix +
+                "SetRegistryScanAssemblyNames raw='" + (assemblyNames ?? "<null>") +
+                "' parsedCount=" + registryScanAssemblyNames.Length +
+                " parsed=[" + FormatRegistryScanAssemblyNames() + "]");
 
             QaTestClient client = Instance != null ? Instance : FindObjectOfType<QaTestClient>(true);
             if (client != null)
             {
+                Debug.Log(RegistryLogPrefix + "SetRegistryScanAssemblyNames found existing client, refreshing registration if connected.");
                 client.RefreshRegistration();
+            }
+            else
+            {
+                Debug.Log(RegistryLogPrefix + "SetRegistryScanAssemblyNames no existing client.");
             }
         }
 
@@ -753,17 +764,29 @@ namespace QaTestFramework
 
         private void RefreshRegistry()
         {
+            Debug.Log(
+                RegistryLogPrefix +
+                "RefreshRegistry begin configuredCount=" +
+                (registryScanAssemblyNames != null ? registryScanAssemblyNames.Length : 0) +
+                " configured=[" + FormatRegistryScanAssemblyNames() + "]");
+
             Assembly[] scanAssemblies = ResolveRegistryScanAssemblies();
             if (registryScanAssemblyNames != null && registryScanAssemblyNames.Length > 0)
             {
+                Debug.Log(
+                    RegistryLogPrefix +
+                    "RefreshRegistry using configured assemblies resolvedCount=" + scanAssemblies.Length +
+                    " resolved=[" + FormatAssemblyNames(scanAssemblies) + "]");
                 registry.Refresh(scanAssemblies);
             }
             else
             {
+                Debug.Log(RegistryLogPrefix + "RefreshRegistry using all loaded assemblies.");
                 registry.Refresh();
             }
 
             registeredMethodCount = registry.Methods.Count;
+            Debug.Log(RegistryLogPrefix + "RefreshRegistry end registeredMethodCount=" + registeredMethodCount);
         }
 
         private void ApplyPlayerPrefsConfiguration()
@@ -897,7 +920,9 @@ namespace QaTestFramework
             connectionState = "Connected";
             Debug.Log("[QaTest] Connected.");
 
+            Debug.Log(RegistryLogPrefix + "ConnectAsync before RefreshRegistry.");
             RefreshRegistry();
+            Debug.Log(RegistryLogPrefix + "ConnectAsync after RefreshRegistry, before SendRegisterAsync.");
             try
             {
                 await SendRegisterAsync(token);
@@ -1470,7 +1495,15 @@ namespace QaTestFramework
 
         private async Task SendRegisterAsync(CancellationToken token)
         {
+            Debug.Log(RegistryLogPrefix + "SendRegisterAsync begin registryMethodCount=" + registry.Methods.Count);
             RefreshLocalIpAddresses();
+            Debug.Log(RegistryLogPrefix + "SendRegisterAsync before registry.ToDtos.");
+            QaTestMethodDto[] methodDtos = registry.ToDtos();
+            Debug.Log(
+                RegistryLogPrefix +
+                "SendRegisterAsync after registry.ToDtos methodCount=" +
+                (methodDtos != null ? methodDtos.Length : 0));
+
             QaTestRegisterMessage registerMessage = new QaTestRegisterMessage
             {
                 clientId = clientId,
@@ -1481,14 +1514,19 @@ namespace QaTestFramework
                 unityVersion = Application.unityVersion,
                 deviceName = GetMachineName(),
                 operatingSystem = GetOperatingSystemName(),
-                methods = registry.ToDtos(),
+                methods = methodDtos,
             };
             ApplyExecutionState(registerMessage);
 
+            Debug.Log(
+                RegistryLogPrefix +
+                "SendRegisterAsync before SendMessageAsync methodCount=" +
+                (registerMessage.methods != null ? registerMessage.methods.Length : 0));
             await SendMessageAsync(registerMessage, token);
             registerSentCount++;
             registeredMethodCount = registerMessage.methods != null ? registerMessage.methods.Length : 0;
             lastRegisteredAtUtc = DateTime.UtcNow;
+            Debug.Log(RegistryLogPrefix + "SendRegisterAsync end registeredMethodCount=" + registeredMethodCount);
         }
 
         private async Task SendHeartbeatAsync()
@@ -1646,10 +1684,16 @@ namespace QaTestFramework
         {
             if (registryScanAssemblyNames == null || registryScanAssemblyNames.Length == 0)
             {
+                Debug.Log(RegistryLogPrefix + "ResolveRegistryScanAssemblies skipped: no configured assembly names.");
                 return new Assembly[0];
             }
 
             Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            Debug.Log(
+                RegistryLogPrefix +
+                "ResolveRegistryScanAssemblies begin requested=[" + FormatRegistryScanAssemblyNames() +
+                "] loadedAssemblyCount=" + (loadedAssemblies != null ? loadedAssemblies.Length : 0));
+
             List<Assembly> assemblies = new List<Assembly>();
             for (int i = 0; i < registryScanAssemblyNames.Length; i++)
             {
@@ -1657,14 +1701,60 @@ namespace QaTestFramework
                 Assembly assembly = FindLoadedAssembly(loadedAssemblies, assemblyName);
                 if (assembly == null)
                 {
-                    Debug.LogWarning("[QaTest] Registry scan assembly not found: " + assemblyName);
+                    Debug.LogWarning(RegistryLogPrefix + "Registry scan assembly not found: " + assemblyName);
                     continue;
                 }
 
+                Debug.Log(RegistryLogPrefix + "Resolved registry scan assembly: " + assemblyName + " -> " + FormatAssemblyName(assembly));
                 assemblies.Add(assembly);
             }
 
+            Debug.Log(RegistryLogPrefix + "ResolveRegistryScanAssemblies end resolvedCount=" + assemblies.Count);
             return assemblies.ToArray();
+        }
+
+        private static string FormatRegistryScanAssemblyNames()
+        {
+            if (registryScanAssemblyNames == null)
+            {
+                return "<null>";
+            }
+
+            return string.Join(",", registryScanAssemblyNames);
+        }
+
+        private static string FormatAssemblyNames(IEnumerable<Assembly> assemblies)
+        {
+            if (assemblies == null)
+            {
+                return "<null>";
+            }
+
+            List<string> names = new List<string>();
+            foreach (Assembly assembly in assemblies)
+            {
+                names.Add(FormatAssemblyName(assembly));
+            }
+
+            return string.Join(",", names);
+        }
+
+        private static string FormatAssemblyName(Assembly assembly)
+        {
+            if (assembly == null)
+            {
+                return "<null>";
+            }
+
+            try
+            {
+                AssemblyName name = assembly.GetName();
+                return name != null ? name.Name : "<unknown>";
+            }
+            catch (Exception exception)
+            {
+                return "<assembly-name-error:" + exception.GetType().Name + ">";
+            }
         }
 
         private static Assembly FindLoadedAssembly(Assembly[] loadedAssemblies, string assemblyName)
