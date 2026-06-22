@@ -41,9 +41,7 @@ namespace QaTestFramework
         private const string ServerPath = "/ws";
         private const string ServerRole = "unity";
         private const string DuplicateClientNameErrorCode = "duplicate_client_name";
-        private const string PackageName = "com.qatestframework.unityclient";
-        private const string PackageJsonFileName = "package.json";
-        private const string PackageVersionFallback = "0.1.9";
+        private const string PackageVersion = "0.1.11";
         private const string RuntimeAssemblyName = "QaTestFramework.UnityClient";
         private const string RegistryLogPrefix = "[QaTest][Registry] ";
         public const string EnabledPlayerPrefsKey = "QaTest.Enabled";
@@ -55,7 +53,6 @@ namespace QaTestFramework
         private static bool globalRuntimeEnabledOverride;
         private static string globalRuntimeEnabledSource = "Runtime";
         private static string[] registryScanAssemblyNames = new string[0];
-        private static string cachedPackageVersion;
 
         [SerializeField] private bool enableInEditor = true;
         [SerializeField] private bool enableInPlayer = false;
@@ -602,19 +599,7 @@ namespace QaTestFramework
 
         public static string GetPackageVersion()
         {
-            if (!string.IsNullOrEmpty(cachedPackageVersion))
-            {
-                return cachedPackageVersion;
-            }
-
-            if (TryReadPackageJsonVersion(out string version))
-            {
-                cachedPackageVersion = version;
-                return cachedPackageVersion;
-            }
-
-            cachedPackageVersion = PackageVersionFallback;
-            return cachedPackageVersion;
+            return PackageVersion;
         }
 
         public static void SetRegistryScanAssemblyNames(string assemblyNames)
@@ -2403,111 +2388,6 @@ namespace QaTestFramework
             return false;
         }
 
-        private static bool TryReadPackageJsonVersion(out string version)
-        {
-            version = string.Empty;
-            string packageJsonPath = GetPackageJsonPath();
-            if (string.IsNullOrWhiteSpace(packageJsonPath) || !File.Exists(packageJsonPath))
-            {
-                return false;
-            }
-
-            try
-            {
-                string packageJson = File.ReadAllText(packageJsonPath, Encoding.UTF8);
-                PackageJsonMetadata metadata = JsonUtility.FromJson<PackageJsonMetadata>(packageJson);
-                version = NormalizeClientName(metadata != null ? metadata.version : string.Empty);
-                return !string.IsNullOrWhiteSpace(version);
-            }
-            catch (Exception exception)
-            {
-                Debug.LogWarning("[QaTest] Failed to read package version: " + exception.Message);
-                return false;
-            }
-        }
-
-        private static string GetPackageJsonPath()
-        {
-#if UNITY_EDITOR
-            try
-            {
-                UnityEditor.PackageManager.PackageInfo packageInfo = UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(QaTestClient).Assembly);
-                if (packageInfo != null && !string.IsNullOrWhiteSpace(packageInfo.resolvedPath))
-                {
-                    string packageJsonPath = Path.Combine(packageInfo.resolvedPath, PackageJsonFileName);
-                    if (File.Exists(packageJsonPath))
-                    {
-                        return packageJsonPath;
-                    }
-                }
-            }
-            catch
-            {
-            }
-#endif
-
-            string projectRoot = GetUnityProjectRoot();
-            if (string.IsNullOrWhiteSpace(projectRoot))
-            {
-                return string.Empty;
-            }
-
-            string embeddedPackageJsonPath = Path.Combine(projectRoot, "Packages", PackageName, PackageJsonFileName);
-            if (File.Exists(embeddedPackageJsonPath))
-            {
-                return embeddedPackageJsonPath;
-            }
-
-            string assetPackageJsonPath = Path.Combine(projectRoot, "Assets", "scripts", PackageJsonFileName);
-            if (File.Exists(assetPackageJsonPath))
-            {
-                return assetPackageJsonPath;
-            }
-
-            string packageCacheDirectory = Path.Combine(projectRoot, "Library", "PackageCache");
-            try
-            {
-                if (Directory.Exists(packageCacheDirectory))
-                {
-                    string[] packageDirectories = Directory.GetDirectories(packageCacheDirectory, PackageName + "*");
-                    for (int i = 0; i < packageDirectories.Length; i++)
-                    {
-                        string packageJsonPath = Path.Combine(packageDirectories[i], PackageJsonFileName);
-                        if (File.Exists(packageJsonPath))
-                        {
-                            return packageJsonPath;
-                        }
-                    }
-                }
-            }
-            catch
-            {
-            }
-
-            return string.Empty;
-        }
-
-        private static string GetUnityProjectRoot()
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(Application.dataPath))
-                {
-                    return string.Empty;
-                }
-
-                DirectoryInfo dataDirectory = new DirectoryInfo(Application.dataPath);
-                DirectoryInfo projectDirectory = dataDirectory.Name.Equals("Assets", StringComparison.OrdinalIgnoreCase)
-                    ? dataDirectory.Parent
-                    : dataDirectory.Parent;
-                return projectDirectory != null ? projectDirectory.FullName : string.Empty;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
         private static QaTestClientConfig LoadOrCreateClientConfig(string inspectorClientName, string fallbackClientName)
         {
             string configPath = GetClientConfigPath();
@@ -2701,12 +2581,6 @@ namespace QaTestFramework
             public bool Exists;
             public string ClientId = string.Empty;
             public string ClientName = string.Empty;
-        }
-
-        [Serializable]
-        private sealed class PackageJsonMetadata
-        {
-            public string version = string.Empty;
         }
 
         private static string NormalizeClientName(string value)
