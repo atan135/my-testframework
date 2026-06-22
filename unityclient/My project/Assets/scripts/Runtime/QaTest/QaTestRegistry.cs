@@ -18,12 +18,23 @@ namespace QaTestFramework
 
         public void Refresh()
         {
+            Refresh(AppDomain.CurrentDomain.GetAssemblies());
+        }
+
+        public void Refresh(IEnumerable<Assembly> assemblies)
+        {
             methods.Clear();
             methodsByFullId.Clear();
             List<QaTestMethodCandidate> candidates = new List<QaTestMethodCandidate>();
 
-            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            IEnumerable<Assembly> scanAssemblies = assemblies ?? AppDomain.CurrentDomain.GetAssemblies();
+            foreach (Assembly assembly in scanAssemblies)
             {
+                if (assembly == null)
+                {
+                    continue;
+                }
+
                 foreach (Type type in SafeGetTypes(assembly))
                 {
                     CollectType(type, candidates);

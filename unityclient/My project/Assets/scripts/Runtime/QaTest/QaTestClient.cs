@@ -43,9 +43,11 @@ namespace QaTestFramework
         public const string EnabledEnvironmentVariable = "QA_TEST_ENABLED";
         private const string EnabledKey = EnabledPlayerPrefsKey;
         private const string EnabledEnvironmentKey = EnabledEnvironmentVariable;
+        private static readonly char[] RegistryScanAssemblyNameSeparators = { ';', ',' };
         private static bool hasGlobalRuntimeEnabledOverride;
         private static bool globalRuntimeEnabledOverride;
         private static string globalRuntimeEnabledSource = "Runtime";
+        private static string[] registryScanAssemblyNames = new string[0];
 
         [SerializeField] private bool enableInEditor = true;
         [SerializeField] private bool enableInPlayer = false;
@@ -590,6 +592,17 @@ namespace QaTestFramework
             return PlayerPrefs.HasKey(AutoConnectOnStartupKey) && PlayerPrefs.GetInt(AutoConnectOnStartupKey, 0) != 0;
         }
 
+        public static void SetRegistryScanAssemblyNames(string assemblyNames)
+        {
+            registryScanAssemblyNames = ParseRegistryScanAssemblyNames(assemblyNames);
+
+            QaTestClient client = Instance != null ? Instance : FindObjectOfType<QaTestClient>(true);
+            if (client != null)
+            {
+                client.RefreshRegistration();
+            }
+        }
+
         public static QaTestClient StartConnect()
         {
             QaTestClient client = Instance != null ? Instance : FindObjectOfType<QaTestClient>(true);
@@ -712,10 +725,24 @@ namespace QaTestFramework
                 return;
             }
 
-            registry.Refresh();
-            registeredMethodCount = registry.Methods.Count;
+            RefreshRegistry();
             CancellationToken token = lifetimeCts != null ? lifetimeCts.Token : CancellationToken.None;
             _ = SendRegisterSafeAsync(token);
+        }
+
+        private void RefreshRegistry()
+        {
+            Assembly[] scanAssemblies = ResolveRegistryScanAssemblies();
+            if (registryScanAssemblyNames != null && registryScanAssemblyNames.Length > 0)
+            {
+                registry.Refresh(scanAssemblies);
+            }
+            else
+            {
+                registry.Refresh();
+            }
+
+            registeredMethodCount = registry.Methods.Count;
         }
 
         private void ApplyPlayerPrefsConfiguration()
@@ -849,8 +876,7 @@ namespace QaTestFramework
             connectionState = "Connected";
             Debug.Log("[QaTest] Connected.");
 
-            registry.Refresh();
-            registeredMethodCount = registry.Methods.Count;
+            RefreshRegistry();
             try
             {
                 await SendRegisterAsync(token);
@@ -1194,8 +1220,7 @@ namespace QaTestFramework
                 hadStaleTarget = true;
             }
 
-            registry.Refresh();
-            registeredMethodCount = registry.Methods.Count;
+            RefreshRegistry();
             if (registry.TryGet(lookupKey, out method) && method.IsTargetAvailable)
             {
                 return method;
@@ -1570,6 +1595,80 @@ namespace QaTestFramework
         private static int NormalizeServerPort(int value)
         {
             return Mathf.Clamp(value, 1, 65535);
+        }
+
+        private static string[] ParseRegistryScanAssemblyNames(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return new string[0];
+            }
+
+            string[] parts = value.Split(RegistryScanAssemblyNameSeparators, StringSplitOptions.RemoveEmptyEntries);
+            List<string> names = new List<string>();
+            HashSet<string> seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < parts.Length; i++)
+            {
+                string name = parts[i].Trim();
+                if (string.IsNullOrEmpty(name) || !seen.Add(name))
+                {
+                    continue;
+                }
+
+                names.Add(name);
+            }
+
+            return names.ToArray();
+        }
+
+        private static Assembly[] ResolveRegistryScanAssemblies()
+        {
+            if (registryScanAssemblyNames == null || registryScanAssemblyNames.Length == 0)
+            {
+                return new Assembly[0];
+            }
+
+            Assembly[] loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            List<Assembly> assemblies = new List<Assembly>();
+            for (int i = 0; i < registryScanAssemblyNames.Length; i++)
+            {
+                string assemblyName = registryScanAssemblyNames[i];
+                Assembly assembly = FindLoadedAssembly(loadedAssemblies, assemblyName);
+                if (assembly == null)
+                {
+                    Debug.LogWarning("[QaTest] Registry scan assembly not found: " + assemblyName);
+                    continue;
+                }
+
+                assemblies.Add(assembly);
+            }
+
+            return assemblies.ToArray();
+        }
+
+        private static Assembly FindLoadedAssembly(Assembly[] loadedAssemblies, string assemblyName)
+        {
+            if (loadedAssemblies == null || string.IsNullOrEmpty(assemblyName))
+            {
+                return null;
+            }
+
+            for (int i = 0; i < loadedAssemblies.Length; i++)
+            {
+                Assembly assembly = loadedAssemblies[i];
+                if (assembly == null)
+                {
+                    continue;
+                }
+
+                AssemblyName name = assembly.GetName();
+                if (name != null && string.Equals(name.Name, assemblyName, StringComparison.Ordinal))
+                {
+                    return assembly;
+                }
+            }
+
+            return null;
         }
 
         private static string FormatHostForUrl(string host)
