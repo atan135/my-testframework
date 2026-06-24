@@ -22,6 +22,7 @@ namespace QaTestFramework
         private const string ClientConfigFileName = "qatest.config.txt";
         private const string ClientIdConfigKey = "clientId";
         private const string ClientNameConfigKey = "clientName";
+        private const string EnableInEditorConfigKey = "enableInEditor";
         private const int ClientIdLength = 32;
         public const string ServerIPPlayerPrefsKey = "QaTest.ServerIP";
         public const string ServerPortPlayerPrefsKey = "QaTest.ServerPort";
@@ -429,7 +430,7 @@ namespace QaTestFramework
                 AssignDefaultClientNameIfEmpty();
                 if (clientConfig.Exists)
                 {
-                    WriteClientConfig(GetClientConfigPath(), clientId, ResolveClientName());
+                    WriteClientConfig(GetClientConfigPath(), clientId, ResolveClientName(), ResolveEditorEnableInEditor(clientConfig));
                 }
 
                 return;
@@ -494,6 +495,114 @@ namespace QaTestFramework
             }
 
             return true;
+        }
+
+        public string GetEditorInspectorClientName()
+        {
+            if (!Application.isEditor)
+            {
+                return clientName;
+            }
+
+            QaTestClientConfig config = ReadClientConfig(GetClientConfigPath());
+            string configuredClientName = NormalizeClientName(config.ClientName);
+            if (!string.IsNullOrWhiteSpace(configuredClientName))
+            {
+                return configuredClientName;
+            }
+
+            return Application.isPlaying ? ResolveClientName() : string.Empty;
+        }
+
+        public bool GetEditorInspectorEnableInEditor()
+        {
+            if (!Application.isEditor)
+            {
+                return enableInEditor;
+            }
+
+            bool configuredEnableInEditor;
+            return TryGetEditorConfiguredEnableInEditor(out configuredEnableInEditor)
+                ? configuredEnableInEditor
+                : enableInEditor;
+        }
+
+        public void SetEditorInspectorClientName(string newClientName, bool resendRegister = true)
+        {
+            string normalizedClientName = NormalizeClientName(newClientName);
+            if (!Application.isEditor)
+            {
+                SetClientName(normalizedClientName, true, resendRegister);
+                return;
+            }
+
+            string configPath = GetClientConfigPath();
+            QaTestClientConfig config = ReadClientConfig(configPath);
+            string persistedClientId = IsValidClientId(clientId) ? clientId : config.ClientId;
+            if (!IsValidClientId(persistedClientId))
+            {
+                persistedClientId = GenerateClientId();
+            }
+
+            if (!IsValidClientId(clientId))
+            {
+                clientId = persistedClientId;
+            }
+
+            string persistedClientName = string.IsNullOrWhiteSpace(normalizedClientName)
+                ? GetDefaultClientName(persistedClientId)
+                : normalizedClientName;
+            WriteClientConfig(configPath, persistedClientId, persistedClientName, ResolveEditorEnableInEditor(config));
+
+            if (Application.isPlaying)
+            {
+                clientName = persistedClientName;
+                if (resendRegister)
+                {
+                    RefreshRegistration();
+                }
+            }
+        }
+
+        public void SetEditorInspectorEnableInEditor(bool isEnabled)
+        {
+            if (!Application.isEditor)
+            {
+                enableInEditor = isEnabled;
+                return;
+            }
+
+            string configPath = GetClientConfigPath();
+            QaTestClientConfig config = ReadClientConfig(configPath);
+            string persistedClientId = IsValidClientId(clientId) ? clientId : config.ClientId;
+            if (!IsValidClientId(persistedClientId))
+            {
+                persistedClientId = GenerateClientId();
+            }
+
+            if (!IsValidClientId(clientId))
+            {
+                clientId = persistedClientId;
+            }
+
+            string configuredClientName = NormalizeClientName(config.ClientName);
+            string persistedClientName = string.IsNullOrWhiteSpace(configuredClientName)
+                ? GetDefaultClientName(persistedClientId)
+                : configuredClientName;
+            WriteClientConfig(configPath, persistedClientId, persistedClientName, isEnabled);
+
+            if (Application.isPlaying)
+            {
+                RefreshEnabledState();
+                if (qaEnabled && !enabled)
+                {
+                    enabled = true;
+                }
+                else if (!qaEnabled && enabled)
+                {
+                    enabled = false;
+                }
+            }
         }
 
         [QaTest("设置客户端名称", "设置并保存当前 QA 客户端名称，传空字符串会恢复为默认名称。")]
@@ -2002,6 +2111,11 @@ namespace QaTestFramework
             enabledSource = resolution.source;
         }
 
+        private bool ResolveEditorEnableInEditor(QaTestClientConfig config)
+        {
+            return config != null && config.HasEnableInEditor ? config.EnableInEditor : enableInEditor;
+        }
+
         private string ResolveClientName()
         {
             if (!string.IsNullOrWhiteSpace(clientName))
@@ -2036,9 +2150,10 @@ namespace QaTestFramework
             }
 
             string configPath = GetClientConfigPath();
+            QaTestClientConfig config = ReadClientConfig(configPath);
             string persistedClientId = IsValidClientId(clientId)
                 ? clientId
-                : ReadClientConfig(configPath).ClientId;
+                : config.ClientId;
             if (!IsValidClientId(persistedClientId))
             {
                 persistedClientId = GenerateClientId();
@@ -2052,7 +2167,7 @@ namespace QaTestFramework
             string persistedClientName = string.IsNullOrWhiteSpace(normalizedClientName)
                 ? GetDefaultClientName(persistedClientId)
                 : normalizedClientName;
-            WriteClientConfig(configPath, persistedClientId, persistedClientName);
+            WriteClientConfig(configPath, persistedClientId, persistedClientName, ResolveEditorEnableInEditor(config));
         }
 
         private static void SaveIpAndPortToPlayerPrefs(string ip, int port)
@@ -2297,8 +2412,18 @@ namespace QaTestFramework
                 return new EnabledResolution { enabled = PlayerPrefs.GetInt(EnabledKey, 0) != 0, source = "PlayerPrefs:" + EnabledKey };
             }
 
-            bool defaultValue = Application.isEditor ? editorDefault : playerDefault;
-            return new EnabledResolution { enabled = defaultValue, source = Application.isEditor ? "Inspector:enableInEditor" : "Inspector:enableInPlayer" };
+            if (Application.isEditor)
+            {
+                bool configuredEnableInEditor;
+                if (TryGetEditorConfiguredEnableInEditor(out configuredEnableInEditor))
+                {
+                    return new EnabledResolution { enabled = configuredEnableInEditor, source = "qatest.config.txt:" + EnableInEditorConfigKey };
+                }
+
+                return new EnabledResolution { enabled = editorDefault, source = "Inspector:enableInEditor" };
+            }
+
+            return new EnabledResolution { enabled = playerDefault, source = "Inspector:enableInPlayer" };
         }
 
         private static bool TryGetCommandLineEnabled(out bool value, out string source)
@@ -2388,6 +2513,24 @@ namespace QaTestFramework
             return false;
         }
 
+        private static bool TryGetEditorConfiguredEnableInEditor(out bool enabled)
+        {
+            enabled = false;
+            if (!Application.isEditor)
+            {
+                return false;
+            }
+
+            QaTestClientConfig config = ReadClientConfig(GetClientConfigPath());
+            if (!config.HasEnableInEditor)
+            {
+                return false;
+            }
+
+            enabled = config.EnableInEditor;
+            return true;
+        }
+
         private static QaTestClientConfig LoadOrCreateClientConfig(string inspectorClientName, string fallbackClientName)
         {
             string configPath = GetClientConfigPath();
@@ -2447,6 +2590,17 @@ namespace QaTestFramework
                     if (key.Equals(ClientNameConfigKey, StringComparison.OrdinalIgnoreCase))
                     {
                         config.ClientName = NormalizeClientName(value);
+                        continue;
+                    }
+
+                    if (key.Equals(EnableInEditorConfigKey, StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool parsedValue;
+                        if (TryParseBoolean(value, out parsedValue))
+                        {
+                            config.EnableInEditor = parsedValue;
+                            config.HasEnableInEditor = true;
+                        }
                     }
                 }
             }
@@ -2458,7 +2612,7 @@ namespace QaTestFramework
             return config;
         }
 
-        private static void WriteClientConfig(string configPath, string configClientId, string configClientName)
+        private static void WriteClientConfig(string configPath, string configClientId, string configClientName, bool configEnableInEditor)
         {
             try
             {
@@ -2471,7 +2625,8 @@ namespace QaTestFramework
                 File.WriteAllText(
                     configPath,
                     ClientIdConfigKey + "=" + NormalizeClientId(configClientId) + Environment.NewLine +
-                    ClientNameConfigKey + "=" + NormalizeClientName(configClientName) + Environment.NewLine,
+                    ClientNameConfigKey + "=" + NormalizeClientName(configClientName) + Environment.NewLine +
+                    EnableInEditorConfigKey + "=" + (configEnableInEditor ? "true" : "false") + Environment.NewLine,
                     new UTF8Encoding(false));
             }
             catch (Exception exception)
@@ -2581,6 +2736,8 @@ namespace QaTestFramework
             public bool Exists;
             public string ClientId = string.Empty;
             public string ClientName = string.Empty;
+            public bool HasEnableInEditor;
+            public bool EnableInEditor = true;
         }
 
         private static string NormalizeClientName(string value)

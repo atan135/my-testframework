@@ -30,6 +30,7 @@ temp/
 
 # Project-local runtime/config files
 local_help.txt
+qatest.config.txt
 qamcp.config.json
 !qamcp.config.example.json
 registerserver/rustserver/artifacts/

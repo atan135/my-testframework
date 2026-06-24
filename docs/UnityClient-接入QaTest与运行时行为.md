@@ -121,7 +121,7 @@ Unity QA 功能默认策略：
 2. 命令行参数。
 3. 环境变量 `QA_TEST_ENABLED`。
 4. PlayerPrefs key `QaTest.Enabled`。
-5. Inspector 默认值 `enableInEditor` 或 `enableInPlayer`。
+5. Editor 本地配置 `qatest.config.txt` 中的 `enableInEditor`，没有配置时回到 Inspector 默认值；Player 回到 `enableInPlayer`。
 
 ### 运行时 API
 
@@ -205,7 +205,7 @@ PlayerPrefs.Save();
 
 在场景中预置 `QaTestClient` 时，可以通过 Inspector 配置：
 
-- `enableInEditor`: Editor 默认启用状态，默认 `true`。
+- `Enable In Editor`: Editor 默认启用状态，默认 `true`。Editor 下修改会保存到项目根目录 `qatest.config.txt`，不会写入 `.unity` 场景文件。
 - `enableInPlayer`: Player 默认启用状态，默认 `false`。
 
 运行时 Inspector 的 Runtime Diagnostics 会显示 `QA Enabled` 和 `Enabled Source`，用于确认当前开关来源。
@@ -241,11 +241,11 @@ QaTestClient.GetIpAndPort(out string ip, out int port);
 
 如果需要更细的控制，可以在场景中预置一个带 `QaTestClient` 的对象，并通过 Inspector 配置：
 
-- `enableInEditor`: Editor 默认启用状态。
+- `Enable In Editor`: Editor 默认启用状态。Editor 下修改会保存到项目根目录 `qatest.config.txt`，不会写入 `.unity` 场景文件。
 - `enableInPlayer`: Player 默认启用状态。
 - `serverIP`: register server IP 或 host。
 - `serverPort`: register server 端口。
-- `clientName`: 客户端显示名称。Editor 下在 Inspector 修改后会立即保存到项目根目录 `qatest.config.txt`。
+- `Client Name`: 客户端显示名称。Editor 下在 Inspector 修改后会立即保存到项目根目录 `qatest.config.txt`，不会写入 `.unity` 场景文件。
 - `reconnectDelaySeconds`: 重连间隔，默认 2 秒。
 - `heartbeatSeconds`: 心跳间隔，默认 10 秒。
 
@@ -276,9 +276,9 @@ QaTestClient.SetClientName("Phone-LoginSmoke");
 - `QaTestClientName.GetResolved()`: 获取最终展示名称。
 - `QaTestClientName.RefreshRegistration()`: 重新扫描当前 `[QaTest]` 方法并主动刷新注册信息。
 
-Editor 下用户修改后的 `clientId` 和 `clientName` 会保存到 Unity 项目根目录的 `qatest.config.txt`。Player 下外部配置只认 PlayerPrefs：`QaTest.ClientId`、`QaTest.ClientName`、`QaTest.ServerIP`、`QaTest.ServerPort` 和 `QaTest.AutoConnectOnStartup`；Player 不再读取或写入 `Application.persistentDataPath/qatest.config.txt`。
+Editor 下用户修改后的 `clientId`、`clientName` 和 `enableInEditor` 会保存到 Unity 项目根目录的 `qatest.config.txt`。Player 下外部配置只认 PlayerPrefs：`QaTest.ClientId`、`QaTest.ClientName`、`QaTest.ServerIP`、`QaTest.ServerPort` 和 `QaTest.AutoConnectOnStartup`；Player 不再读取或写入 `Application.persistentDataPath/qatest.config.txt`。
 
-Editor 下如果 `qatest.config.txt` 不存在，客户端会继续使用由 `clientId` 推导出的默认名称，不会自动把默认名写入本地文件。只要用户在 Inspector 或持久化 API 中修改过一次名称，客户端就会创建或更新项目根目录 `qatest.config.txt`；后续任意场景或任意位置启用的 `QaTestClient` 都会读取该文件中的 `clientName`，并同步显示到 Inspector。再次修改 Inspector 会立即更新该本地配置。
+Editor 下如果 `qatest.config.txt` 不存在，客户端会继续使用由 `clientId` 推导出的默认名称，不会自动把默认名写入本地文件。只要用户在 Inspector 或持久化 API 中修改过一次名称，客户端就会创建或更新项目根目录 `qatest.config.txt`；后续任意场景或任意位置启用的 `QaTestClient` 都会读取该文件中的 `clientName`，并同步显示到 Inspector。再次修改 Inspector 会立即更新该本地配置，不会写入 `.unity` 场景文件。
 
 Player 下 `clientName` 从 PlayerPrefs `QaTest.ClientName` 读取；没有设置时用 `clientId` 前 8 位作为默认名称。删除 PlayerPrefs 中的 `QaTest.ClientName` 会回到默认名称，删除 `QaTest.ClientId` 会生成新的身份。
 
