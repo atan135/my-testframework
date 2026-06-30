@@ -126,7 +126,15 @@ import { CopyDocument, Refresh, RefreshRight, View } from '@element-plus/icons-v
 
 import ResultDetailsDialog from '../components/ResultDetailsDialog.vue';
 import { useQaStore } from '../composables/useQaStore';
-import { formatOutputPreview, formatTime, historyStatusType, parameterLabel } from '../utils/qaFormatters';
+import {
+  formatArgumentsPreview,
+  formatOutputPreview,
+  formatTime,
+  historyStatusType,
+  parameterLabel,
+  recordClientIp,
+  recordClientName,
+} from '../utils/qaFormatters';
 
 const { clients, controller, executeMethod: sendExecute, history, refreshAll } = useQaStore();
 
@@ -152,7 +160,7 @@ watchEffect(() => {
     }
   }
   for (const item of history.value) {
-    const name = historyClientNameFromRecord(item);
+    const name = recordClientName(item);
     if (item.clientId && name && name !== item.clientId) {
       next[item.clientId] = name;
     }
@@ -178,6 +186,8 @@ const filteredHistory = computed(() => {
       item.methodRealName,
       item.clientId,
       historyClientName(item),
+      historyClientIp(item),
+      formatArgumentsPreview(item),
       formatOutputPreview(item),
       item.error,
     ]
@@ -249,21 +259,12 @@ function openResultDetails(row) {
 
 function historyClientName(row) {
   const client = findClient(row.clientId);
-  return client?.name || clientNameById.value[row.clientId] || historyClientNameFromRecord(row) || row.clientId || '-';
+  return client?.name || clientNameById.value[row.clientId] || recordClientName(row) || row.clientId || '-';
 }
 
-function historyClientNameFromRecord(row) {
-  return (
-    row.clientName ||
-    row.name ||
-    row.client?.name ||
-    row.client?.clientName ||
-    row.clientSnapshot?.name ||
-    row.clientSnapshot?.clientName ||
-    row.client_snapshot?.name ||
-    row.client_snapshot?.clientName ||
-    ''
-  );
+function historyClientIp(row) {
+  const client = findClient(row.clientId);
+  return client?.ipAddress || client?.remoteAddress || recordClientIp(row) || '-';
 }
 
 async function copyClientId(row) {

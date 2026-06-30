@@ -475,7 +475,8 @@ fn print_results(data: &Value) {
     print_table(
         &[
             "status",
-            "clientId",
+            "client",
+            "ip",
             "methodName",
             "requestId",
             "sequenceId",
@@ -488,7 +489,13 @@ fn print_results(data: &Value) {
             .map(|result| {
                 vec![
                     text(result, "status").unwrap_or_default(),
-                    text(result, "clientId").unwrap_or_default(),
+                    text(result, "clientName")
+                        .or_else(|| text(result, "clientId"))
+                        .unwrap_or_default(),
+                    text(result, "clientIpAddress")
+                        .or_else(|| text(result, "clientIp"))
+                        .or_else(|| text(result, "clientRemoteAddress"))
+                        .unwrap_or_default(),
                     text(result, "methodName")
                         .or_else(|| text(result, "methodId"))
                         .unwrap_or_default(),

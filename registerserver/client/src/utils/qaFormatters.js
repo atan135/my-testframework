@@ -62,6 +62,69 @@ export function formatOutputDetails(row) {
   return '-';
 }
 
+export function formatArgumentsPreview(row, maxLength = 120) {
+  return truncateText(formatArgumentsText(row), maxLength);
+}
+
+export function formatArgumentsDetails(row) {
+  return formatArgumentsText(row, true);
+}
+
+export function recordClientName(row) {
+  if (!row) {
+    return '';
+  }
+
+  return (
+    row.clientName ||
+    row.name ||
+    row.client?.name ||
+    row.client?.clientName ||
+    row.clientSnapshot?.name ||
+    row.clientSnapshot?.clientName ||
+    row.client_snapshot?.name ||
+    row.client_snapshot?.clientName ||
+    ''
+  );
+}
+
+export function recordClientIp(row) {
+  if (!row) {
+    return '';
+  }
+
+  return (
+    row.clientIpAddress ||
+    row.clientIp ||
+    row.ipAddress ||
+    row.remoteAddress ||
+    row.clientRemoteAddress ||
+    row.client?.ipAddress ||
+    row.client?.clientIpAddress ||
+    row.client?.remoteAddress ||
+    row.clientSnapshot?.ipAddress ||
+    row.clientSnapshot?.clientIpAddress ||
+    row.clientSnapshot?.remoteAddress ||
+    row.client_snapshot?.ipAddress ||
+    row.client_snapshot?.clientIpAddress ||
+    row.client_snapshot?.remoteAddress ||
+    ''
+  );
+}
+
+export function recordClientIpList(row) {
+  const values = [
+    ...(Array.isArray(row?.clientIpAddresses) ? row.clientIpAddresses : []),
+    ...(Array.isArray(row?.ipAddresses) ? row.ipAddresses : []),
+    ...(Array.isArray(row?.client?.ipAddresses) ? row.client.ipAddresses : []),
+    ...(Array.isArray(row?.clientSnapshot?.ipAddresses) ? row.clientSnapshot.ipAddresses : []),
+    ...(Array.isArray(row?.client_snapshot?.ipAddresses) ? row.client_snapshot.ipAddresses : []),
+    recordClientIp(row),
+  ];
+
+  return [...new Set(values.filter(Boolean))];
+}
+
 function primaryOutputValue(row) {
   if (!row) {
     return '';
@@ -72,6 +135,15 @@ function primaryOutputValue(row) {
   }
 
   return row.result;
+}
+
+function formatArgumentsText(row, pretty = false) {
+  const args = Array.isArray(row?.arguments) ? row.arguments : [];
+  if (args.length === 0) {
+    return '[]';
+  }
+
+  return pretty ? JSON.stringify(args, null, 2) : toSingleLine(JSON.stringify(args));
 }
 
 function normalizeOutputValue(value) {

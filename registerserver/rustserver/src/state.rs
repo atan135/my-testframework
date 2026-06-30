@@ -112,6 +112,14 @@ pub(crate) struct ControllerIdentity {
 pub(crate) struct ExecutionRecord {
     pub(crate) request_id: String,
     pub(crate) client_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) client_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) client_ip_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) client_remote_address: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) client_ip_addresses: Option<Vec<String>>,
     pub(crate) method_id: String,
     pub(crate) method_name: String,
     pub(crate) arguments: Vec<String>,

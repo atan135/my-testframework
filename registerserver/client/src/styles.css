@@ -544,14 +544,42 @@ h3 {
   line-height: 1.2;
 }
 
+.result-detail-meta-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .result-detail-meta-value {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   color: #18222f;
   font-size: 13px;
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.result-detail-meta-copy {
+  flex-shrink: 0;
+}
+
+.result-detail-section {
+  display: grid;
+  gap: 6px;
+}
+
+.result-detail-section + .result-detail-section {
+  margin-top: 12px;
+}
+
+.result-detail-section-title {
+  color: #35465c;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
 }
 
 .result-detail-output {
@@ -568,6 +596,10 @@ h3 {
   font-family: "Cascadia Mono", "Consolas", monospace;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.result-detail-arguments {
+  max-height: 160px;
 }
 
 .result-detail-footer {

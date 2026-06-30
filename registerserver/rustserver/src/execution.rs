@@ -12,7 +12,7 @@ use crate::{
     state::{
         ClientLock, ControllerIdentity, DispatchRequest, DispatchResult, ExecutionMeta,
         ExecutionPatch, ExecutionRecord, HISTORY_LIMIT, PendingExecution, RequestError, Sender,
-        ServerState, SharedState,
+        ServerState, SharedState, UnityClient,
     },
     util::{
         iso_now, normalize_arguments, uuid, value_to_opt_string, value_to_string, value_to_u64,
@@ -61,9 +61,13 @@ pub(crate) async fn dispatch_unity_execution(
         "arguments": arguments,
     });
 
-    let started = ExecutionRecord {
+    let mut started = ExecutionRecord {
         request_id: request_id.clone(),
         client_id: request.client_id.clone(),
+        client_name: None,
+        client_ip_address: None,
+        client_remote_address: None,
+        client_ip_addresses: None,
         method_id: resolved_method_id.clone(),
         method_name: command_method_name.clone(),
         arguments: arguments.clone(),
@@ -110,6 +114,8 @@ pub(crate) async fn dispatch_unity_execution(
                 return Err(error);
             }
         };
+
+        apply_client_snapshot_locked(&inner, &mut started);
 
         inner.pending_executions.insert(
             request_id.clone(),
@@ -217,10 +223,14 @@ async fn complete_pending_execution(
     let mut inner = state.inner.write().await;
     let mut pending = inner.pending_executions.remove(request_id)?;
     let mut result = pending.started.clone();
+    let started_client_id = result.client_id.clone();
 
     result.request_id = request_id.to_string();
     if let Some(client_id) = patch.client_id {
         result.client_id = client_id;
+    }
+    if result.client_id != started_client_id {
+        clear_client_snapshot(&mut result);
     }
     if let Some(method_id) = patch.method_id {
         result.method_id = method_id;
@@ -234,6 +244,7 @@ async fn complete_pending_execution(
     result.error = Some(patch.error);
     result.duration_ms = Some(patch.duration_ms);
     result.finished_at = Some(patch.finished_at);
+    apply_client_snapshot_locked(&inner, &mut result);
     let owner = ControllerIdentity {
         id: pending.owner_id.clone(),
         controller_type: pending.owner_type.clone(),
@@ -360,7 +371,11 @@ pub(crate) async fn handle_unity_qa_result(
 
     let result = ExecutionRecord {
         request_id: request_id.clone(),
-        client_id,
+        client_id: client_id.clone(),
+        client_name: None,
+        client_ip_address: None,
+        client_remote_address: None,
+        client_ip_addresses: None,
         method_id,
         method_name,
         arguments: Vec::new(),
@@ -380,6 +395,8 @@ pub(crate) async fn handle_unity_qa_result(
     };
 
     let mut inner = state.inner.write().await;
+    let mut result = result;
+    apply_client_snapshot_locked(&inner, &mut result);
     if let Some(existing) = find_history_by_request_id_locked(&inner, &request_id)
         && existing.status != "running"
     {
@@ -955,6 +972,10 @@ pub(crate) fn build_server_failure_result(
     ExecutionRecord {
         request_id: uuid(),
         client_id: client_id.to_string(),
+        client_name: None,
+        client_ip_address: None,
+        client_remote_address: None,
+        client_ip_addresses: None,
         method_id: method_id.or(method_name).unwrap_or_default().to_string(),
         method_name: method_name.or(method_id).unwrap_or_default().to_string(),
         arguments: normalize_arguments(method_arguments),
@@ -971,5 +992,42 @@ pub(crate) fn build_server_failure_result(
         step_index: meta.step_index,
         step_number: meta.step_number,
         total_steps: meta.total_steps,
+    }
+}
+
+pub(crate) fn apply_client_snapshot_locked(inner: &ServerState, record: &mut ExecutionRecord) {
+    let Some(client) = inner.unity_clients.get(&record.client_id) else {
+        return;
+    };
+    apply_client_snapshot(record, client);
+}
+
+fn apply_client_snapshot(record: &mut ExecutionRecord, client: &UnityClient) {
+    if record.client_name.is_none() {
+        record.client_name = non_empty_string(&client.name);
+    }
+    if record.client_ip_address.is_none() {
+        record.client_ip_address = non_empty_string(&client.ip_address);
+    }
+    if record.client_remote_address.is_none() {
+        record.client_remote_address = non_empty_string(&client.remote_address);
+    }
+    if record.client_ip_addresses.is_none() && !client.ip_addresses.is_empty() {
+        record.client_ip_addresses = Some(client.ip_addresses.clone());
+    }
+}
+
+fn clear_client_snapshot(record: &mut ExecutionRecord) {
+    record.client_name = None;
+    record.client_ip_address = None;
+    record.client_remote_address = None;
+    record.client_ip_addresses = None;
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value.to_string())
     }
 }

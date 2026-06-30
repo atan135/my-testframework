@@ -6,8 +6,9 @@ use tokio::{sync::Notify, time};
 
 use crate::{
     execution::{
-        add_history_locked, build_server_failure_result, dispatch_unity_execution,
-        prepare_client_for_execution_locked, release_client_lock_if_idle_locked,
+        add_history_locked, apply_client_snapshot_locked, build_server_failure_result,
+        dispatch_unity_execution, prepare_client_for_execution_locked,
+        release_client_lock_if_idle_locked,
     },
     logging::LogEvent,
     messaging::broadcast_web_locked,
@@ -235,7 +236,7 @@ pub(crate) async fn run_execution_sequence(
                 result
             }
             Err(error) => {
-                let result = build_server_failure_result(
+                let mut result = build_server_failure_result(
                     &client_id,
                     Some(&step.method_id),
                     Some(&step.method_name),
@@ -244,6 +245,7 @@ pub(crate) async fn run_execution_sequence(
                     &step_meta,
                 );
                 let mut inner = state.inner.write().await;
+                apply_client_snapshot_locked(&inner, &mut result);
                 add_history_locked(&mut inner, result.clone());
                 state
                     .archive

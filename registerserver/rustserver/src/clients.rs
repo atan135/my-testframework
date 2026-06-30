@@ -694,6 +694,10 @@ mod tests {
         ExecutionRecord {
             request_id: request_id.to_string(),
             client_id: "client-1".to_string(),
+            client_name: None,
+            client_ip_address: None,
+            client_remote_address: None,
+            client_ip_addresses: None,
             method_id: "Method()".to_string(),
             method_name: "Method".to_string(),
             arguments: Vec::new(),

@@ -321,7 +321,7 @@ GET /api/unity-clients
 GET /api/results
 ```
 
-返回最近 200 条执行记录。相同 `requestId` 的 running 记录会在结果返回后被更新。
+返回最近 200 条执行记录。相同 `requestId` 的 running 记录会在结果返回后被更新。记录中会保留本次执行开始时的客户端快照字段，包括 `clientName`、`clientIpAddress`、`clientRemoteAddress` 和 `clientIpAddresses`，因此 Unity 客户端后续断开后仍可在历史中看到当时的名称和 IP。记录也包含本次执行下发的 `arguments`。
 
 这部分历史是内存中的最近视图，服务重启后重新累计。长期追溯可以使用 `QA_LOG_DIR` 配置的 JSON line 日志文件；需要长期查询和审计时，可开启可选 MariaDB/MySQL 执行历史存档。数据库存档只做旁路写入，不改变 `/api/results` 的返回来源。
 
@@ -555,7 +555,7 @@ Unity 完成后返回 `qa_result`。Unity client 会把 `failed:<reason>`、`fal
 }
 ```
 
-服务端会补充 `status`、`finishedAt` 等字段后广播给 Web 端，并写入历史。
+服务端会补充 `status`、`finishedAt`、`arguments` 和客户端快照字段后广播给 Web 端，并写入历史。
 
 当 Unity 注册的方法元数据包含 `allowParallelExecution: true`，或执行请求显式传入 `allowParallelExecution: true` 时，Rust server 会允许同一 `clientId` 的该请求与其它执行并行下发，并把该字段透传给 Unity。该能力应只用于只读查询类方法；默认仍保持同一 Unity 客户端互斥执行。
 
@@ -598,8 +598,13 @@ Web 端或 MCP 工具可以发送 `execute_sequence`：
 
 - `requestId`
 - `clientId`
+- `clientName`
+- `clientIpAddress`
+- `clientRemoteAddress`
+- `clientIpAddresses`
 - `methodId`
 - `methodName`
+- `arguments`
 - `status`: `running`、`success`、`failed` 或 `cancelled`
 - `success`
 - `result`
